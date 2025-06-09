@@ -1,0 +1,131 @@
+import java_cup.runtime.*;
+import java.util.HashMap;
+import java.util.Stack;
+
+parser code {:
+    private static HashMap<String, Object> symbolTable = new HashMap<>();
+    private static Stack<Boolean> executionStack = new Stack<>();
+    
+    public static void main(String[] args) throws Exception {
+        System.out.println("Iniciando analise do arquivo input.txt...\n");
+        executionStack.push(true); // Estado inicial: executar tudo
+        Scanner scanner = new Scanner(new java.io.FileReader("input.txt"));
+        Parser parser = new Parser(scanner);
+        parser.parse();
+        
+        System.out.println("\nTabela de Simbolos Final:");
+        symbolTable.forEach((k,v) -> System.out.println(k + " = " + v));
+        System.out.println("\nAnalise concluida com sucesso!");
+    }
+    
+    private boolean shouldExecute() {
+        return !executionStack.isEmpty() && executionStack.peek();
+    }
+:}
+
+/* Terminais */
+terminal IF, ELSE;
+terminal PLUS, MINUS, TIMES, DIVIDE;
+terminal EQ, GT, LT, EQEQ;
+terminal LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON;
+terminal Integer INTEGER;
+terminal Float FLOAT;
+terminal String ID;
+
+/* Nao-terminais */
+non terminal program;
+non terminal statement_list;
+non terminal statement;
+non terminal Object expression;
+non terminal Boolean condition;
+
+/* Precedencias */
+precedence left SEMICOLON;
+precedence left PLUS, MINUS;
+precedence left TIMES, DIVIDE;
+precedence left EQEQ, GT, LT;
+
+/* Gramatica */
+program ::= statement_list;
+
+statement_list ::= 
+    statement
+    | statement_list statement
+;
+
+statement ::= 
+    IF LPAREN condition:cond RPAREN LBRACE 
+    {: executionStack.push((Boolean)cond); :} 
+    statement_list:if_part RBRACE ELSE LBRACE 
+    {: executionStack.push(!(Boolean)cond); :} 
+    statement_list:else_part RBRACE 
+    {: 
+        executionStack.pop(); // Remove else condition
+        executionStack.pop(); // Remove if condition
+        System.out.println((Boolean)cond ? "Bloco IF executado" : "Bloco ELSE executado");
+    :}
+    | expression SEMICOLON
+;
+
+expression ::= 
+    expression:e1 PLUS expression:e2 {: 
+        if (shouldExecute()) {
+            RESULT = (Double)e1 + (Double)e2;
+            System.out.println("Operacao de soma realizada: " + e1 + " + " + e2);
+        }
+    :}
+    | expression:e1 MINUS expression:e2 {: 
+        if (shouldExecute()) {
+            RESULT = (Double)e1 - (Double)e2;
+            System.out.println("Operacao de subtracao realizada: " + e1 + " - " + e2);
+        }
+    :}
+    | expression:e1 TIMES expression:e2 {: 
+        if (shouldExecute()) {
+            RESULT = (Double)e1 * (Double)e2;
+            System.out.println("Operacao de multiplicacao realizada: " + e1 + " * " + e2);
+        }
+    :}
+    | expression:e1 DIVIDE expression:e2 {: 
+        if (shouldExecute()) {
+            RESULT = (Double)e1 / (Double)e2;
+            System.out.println("Operacao de divisao realizada: " + e1 + " / " + e2);
+        }
+    :}
+    | ID:id EQ expression:e {: 
+        if (shouldExecute()) {
+            symbolTable.put((String)id, e);
+            RESULT = e;
+            System.out.println("Atribuicao realizada: " + id + " = " + e);
+        }
+    :}
+    | INTEGER:i {: 
+        RESULT = Double.valueOf((Integer)i); 
+    :}
+    | FLOAT:f {: 
+        RESULT = Double.valueOf((Float)f); 
+    :}
+    | ID:id {: 
+        Object value = symbolTable.get((String)id);
+        if (value == null) throw new Error("Variavel nao definida: " + id);
+        RESULT = value;
+    :}
+    | LPAREN expression:e RPAREN {: 
+        RESULT = e; 
+    :}
+;
+
+condition ::=
+    expression:e1 EQEQ expression:e2 {: 
+        RESULT = e1.equals(e2);
+        System.out.println("Comparacao de igualdade realizada: " + e1 + " == " + e2);
+    :}
+    | expression:e1 GT expression:e2 {: 
+        RESULT = (Double)e1 > (Double)e2;
+        System.out.println("Comparacao 'maior que' realizada: " + e1 + " > " + e2);
+    :}
+    | expression:e1 LT expression:e2 {: 
+        RESULT = (Double)e1 < (Double)e2;
+        System.out.println("Comparacao 'menor que' realizada: " + e1 + " < " + e2);
+    :}
+;
